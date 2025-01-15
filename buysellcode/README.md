@@ -38,6 +38,11 @@ Install dependencies
 ```bash
   npm install
 ```
+### To auto buy x amount of UCASH every X seconds, run this.
+```bash
+node autobuy.js
+```
+
 ### To buy, run this.
 ```bash
 node buy.js
