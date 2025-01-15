@@ -1,79 +1,74 @@
-require("dotenv").config(); // Load .env file
+require("dotenv").config();
 const axios = require("axios");
 const crypto = require("crypto");
 
-// YoBit API credentials from .env
-const API_KEY = process.env.API_KEY;
-const API_SECRET = process.env.API_SECRET;
+const { API_KEY, API_SECRET } = process.env;
 
-// Function to make YoBit API requests
+if (!API_KEY || !API_SECRET) {
+    throw new Error("API_KEY and API_SECRET must be set in the .env file.");
+}
+
+// Function for YoBit API requests
 async function yobitApiRequest(method, params = {}) {
-  const nonce = Math.floor(Date.now() / 1000); // Generate a nonce based on current time
-  params.method = method;
-  params.nonce = nonce;
+    const nonce = Math.floor(Date.now() / 1000);
+    params.method = method;
+    params.nonce = nonce;
 
-  // Prepare the post data
-  const postData = new URLSearchParams(params).toString();
+    const postData = new URLSearchParams(params).toString();
+    const sign = crypto.createHmac("sha512", API_SECRET).update(postData).digest("hex");
 
-  // Create the HMAC SHA512 signature
-  const sign = crypto
-    .createHmac("sha512", API_SECRET)
-    .update(postData)
-    .digest("hex");
-
-  // Make the request
-  try {
-    const response = await axios.post("https://yobit.net/tapi/", postData, {
-      headers: {
-        Key: API_KEY,
-        Sign: sign,
-      },
-    });
-    return response.data;
-  } catch (error) {
-    console.error("Error making API request:", error);
-  }
-}
-
-// Function to place a trade
-async function placeTrade(pair, type, rate, amount, orderType) {
-  const response = await fetch(`https://yobit.net/api/3/depth/${pair}`);
-  const data = await response.json();
-  const bidPrice = data[pair].bids[0][0];
-
-  const tradeParams = {
-    pair: pair,
-    type: type,
-    amount: amount,
-  };
-
-  if (orderType === "limit") {
-    tradeParams.rate = rate;
-  } else if (orderType === "market") {
     try {
-      tradeParams.rate = bidPrice.toFixed(8);
+        const response = await axios.post("https://yobit.net/tapi/", postData, {
+            headers: {
+                Key: API_KEY,
+                Sign: sign,
+            },
+        });
+        return response.data;
     } catch (error) {
-      console.error("Error fetching data", error);
+        console.error("Error making API request:", error.message);
+        throw error;
     }
-  } else {
-    throw new Error('Invalid order type. Use "limit" or "market".');
-  }
-
-  const tradeResult = await yobitApiRequest("Trade", tradeParams);
-
-  if (tradeResult && tradeResult.success === 1) {
-    console.log("Trade Successful:", tradeResult.return);
-  } else {
-    console.log("Trade Error:", tradeResult.error);
-  }
 }
 
+// Function to fetch current market bid price
+async function getMarketBidPrice(pair) {
+    try {
+        const response = await axios.get(`https://yobit.net/api/3/depth/${pair}`);
+        return response.data[pair].bids[0][0];
+    } catch (error) {
+        console.error("Error fetching market bid price:", error.message);
+        throw error;
+    }
+}
+
+// Function to place a sell trade
+async function placeTrade(pair, type, rate, amount, orderType) {
+    try {
+        let tradeParams = { pair, type, amount };
+
+        if (orderType === "limit") {
+            tradeParams.rate = rate;
+        } else if (orderType === "market") {
+            tradeParams.rate = await getMarketBidPrice(pair);
+        } else {
+            throw new Error('Invalid order type. Use "limit" or "market".');
+        }
+
+        const tradeResult = await yobitApiRequest("Trade", tradeParams);
+
+        if (tradeResult.success === 1) {
+            console.log("Trade successful:", tradeResult.return);
+        } else {
+            console.error("Trade error:", tradeResult.error);
+        }
+    } catch (error) {
+        console.error("Failed to place trade:", error.message);
+    }
+}
+
+// Example usage
+ placeTrade("ucash_btc", "sell", "0.00000001", "5200", "limit");
+// placeTrade("ucash_btc", "sell", null, "20000", "market");
 
 
-// Limit order
-// placeTrade(['trade_pair'], ['sell'], ['rate'], [amount], ['limit'])
-// placeTrade("ucash_btc", "sell", "0.00000001", "5200", "limit");
-
-// Market order
-// placeTrade(['trade_pair'], ['buy'], [null], [amount], ['market'])
-// placeTrade('ucash_btc', 'sell', null, '20000', 'market');
