@@ -73,5 +73,5 @@ async function placeTrade(pair, type, rate, amount, orderType) {
 }
 
 // Example usage: Adjust values as needed
- placeTrade('ucash_btc', 'buy', '0.00000002', '1111', 'limit');
+// placeTrade('ucash_btc', 'buy', '0.00000002', '1111', 'limit');
 //placeTrade('ucash_btc', 'buy', null, '520', 'market');

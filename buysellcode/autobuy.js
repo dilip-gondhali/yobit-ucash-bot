@@ -1,14 +1,15 @@
-require("dotenv").config();
+require("dotenv").config(); // Load environment variables
 const axios = require("axios");
 const crypto = require("crypto");
 
+// Load YoBit API credentials
 const { API_KEY, API_SECRET } = process.env;
 
 if (!API_KEY || !API_SECRET) {
     throw new Error("API_KEY and API_SECRET must be set in the .env file.");
 }
 
-// Function for YoBit API requests
+// Helper function for YoBit API requests
 async function yobitApiRequest(method, params = {}) {
     const nonce = Math.floor(Date.now() / 1000);
     params.method = method;
@@ -31,26 +32,31 @@ async function yobitApiRequest(method, params = {}) {
     }
 }
 
-// Function to fetch current market bid price
-async function getMarketBidPrice(pair) {
+// Fetch current market price for a trading pair
+async function getMarketPrice(pair) {
     try {
         const response = await axios.get(`https://yobit.net/api/3/depth/${pair}`);
-        return response.data[pair].bids[0][0];
+        return response.data[pair].asks[0][0];
     } catch (error) {
-        console.error("Error fetching market bid price:", error.message);
+        console.error("Error fetching market price:", error.message);
         throw error;
     }
 }
 
-// Function to place a sell trade
+// Function to place a trade with enhanced error handling
 async function placeTrade(pair, type, rate, amount, orderType) {
     try {
-        let tradeParams = { pair, type, amount };
+        
+        const tradeParams = {
+            pair,
+            type,
+            amount
+        };
 
         if (orderType === "limit") {
             tradeParams.rate = rate;
         } else if (orderType === "market") {
-            tradeParams.rate = await getMarketBidPrice(pair);
+            tradeParams.rate = await getMarketPrice(pair);
         } else {
             throw new Error('Invalid order type. Use "limit" or "market".');
         }
@@ -67,8 +73,13 @@ async function placeTrade(pair, type, rate, amount, orderType) {
     }
 }
 
-// Example usage
-// placeTrade("ucash_btc", "sell", "0.00000001", "5200", "limit");
-// placeTrade("ucash_btc", "sell", null, "20000", "market");
+// Function to buy UCASH every y seconds
+async function autoBuyUCASH(amount, rate, intervalSeconds, orderType) {
+    setInterval(async () => {
+        await placeTrade('ucash_btc', 'buy', rate, amount, orderType);
+    }, intervalSeconds * 1000);
+}
 
-
+// Example usage: Adjust values as needed
+//autoBuyUCASH('0.00000002', '1111', 60, 'limit');
+autoBuyUCASH('11111111',null, 30, 'market');
